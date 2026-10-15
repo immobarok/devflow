@@ -14,15 +14,12 @@ var (
 	ErrExpiredToken = errors.New("token has expired")
 )
 
-// Claims represents the JWT payload.
-// We embed jwt.RegisteredClaims to get standard fields like exp, iat, iss, jti.
 type Claims struct {
 	UserID string `json:"user_id"`
 	Email  string `json:"email,omitempty"`
 	jwt.RegisteredClaims
 }
 
-// GenerateAccessToken creates a short-lived signed JWT for authenticating API requests.
 func GenerateAccessToken(userID, email, secret string, ttl time.Duration) (string, error) {
 	now := time.Now()
 	claims := Claims{
@@ -45,7 +42,6 @@ func GenerateAccessToken(userID, email, secret string, ttl time.Duration) (strin
 	return tokenString, nil
 }
 
-// GenerateRefreshToken creates a signed JWT for refreshing access tokens.
 func GenerateRefreshToken(userID, secret string, ttl time.Duration) (string, error) {
 	now := time.Now()
 	claims := Claims{
@@ -67,10 +63,8 @@ func GenerateRefreshToken(userID, secret string, ttl time.Duration) (string, err
 	return tokenString, nil
 }
 
-// ValidateToken parses and validates a signed JWT string using HMAC SHA-256.
 func ValidateToken(tokenString, secret string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		// Verify that the signing method is HMAC
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
