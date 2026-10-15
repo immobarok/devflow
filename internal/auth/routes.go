@@ -7,6 +7,8 @@ func RegisterRoutes(rg *gin.RouterGroup, h *Handler, authMiddleware gin.HandlerF
 	{
 		authGroup.POST("/register", h.Register)
 		authGroup.POST("/login", h.Login)
+		authGroup.POST("/refresh", h.RefreshToken)
+		authGroup.POST("/logout", h.Logout)
 		authGroup.POST("/forgot-password", h.ForgotPassword)
 		authGroup.POST("/verify-otp", h.VerifyOTP)
 		authGroup.POST("/reset-password", h.ResetPassword)

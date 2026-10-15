@@ -22,6 +22,8 @@ type Service interface {
 	ForgotPassword(ctx context.Context, req ForgotPasswordRequest) (string, error)
 	VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*VerifyOTPResponse, error)
 	ResetPassword(ctx context.Context, req ResetPasswordRequest) error
+	RefreshToken(ctx context.Context, req RefreshTokenRequest) (*RefreshTokenResponse, error)
+	Logout(ctx context.Context, req LogoutRequest) error
 }
 
 type service struct {
@@ -242,4 +244,74 @@ func generateSecureOTP(length int) (string, error) {
 		b[i] = digits[int(b[i])%len(digits)]
 	}
 	return string(b), nil
+}
+
+func (s *service) RefreshToken(ctx context.Context, req RefreshTokenRequest) (*RefreshTokenResponse, error) {
+	claims, err := jwtpkg.ValidateToken(req.RefreshToken, s.cfg.JWTRefreshSecret)
+	if err != nil {
+		return nil, apperrors.ErrUnauthorized
+	}
+
+	if claims.TokenType != "refresh" {
+		return nil, apperrors.ErrUnauthorized
+	}
+
+	tokenRecord, err := s.repo.FindRefreshToken(ctx, req.RefreshToken)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrNotFound) {
+			return nil, apperrors.ErrUnauthorized
+		}
+		return nil, fmt.Errorf("failed to query refresh token: %w", err)
+	}
+
+	if tokenRecord.IsRevoked {
+		// Token reuse detection: if an already-revoked refresh token is used, suspect breach and revoke all sessions
+		_ = s.repo.RevokeAllUserRefreshTokens(ctx, tokenRecord.UserID)
+		return nil, apperrors.ErrUnauthorized
+	}
+
+	if time.Now().After(tokenRecord.ExpiresAt) {
+		return nil, apperrors.ErrUnauthorized
+	}
+
+	user, err := s.repo.FindUserByID(ctx, tokenRecord.UserID)
+	if err != nil || !user.IsActive {
+		return nil, apperrors.ErrUnauthorized
+	}
+
+	// Rotate refresh token
+	if err := s.repo.RevokeRefreshToken(ctx, req.RefreshToken); err != nil {
+		return nil, fmt.Errorf("failed to revoke old refresh token: %w", err)
+	}
+
+	newAccessToken, err := jwtpkg.GenerateAccessToken(user.ID, user.Email, s.cfg.JWTSecret, s.cfg.AccessTokenExpiry)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate access token: %w", err)
+	}
+
+	newRefreshToken, err := jwtpkg.GenerateRefreshToken(user.ID, s.cfg.JWTRefreshSecret, s.cfg.RefreshTokenExpiry)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
+	newRecord := &RefreshToken{
+		UserID:    user.ID,
+		Token:     newRefreshToken,
+		ExpiresAt: time.Now().Add(s.cfg.RefreshTokenExpiry),
+		IsRevoked: false,
+	}
+	if err := s.repo.SaveRefreshToken(ctx, newRecord); err != nil {
+		return nil, fmt.Errorf("failed to save new refresh token: %w", err)
+	}
+
+	return &RefreshTokenResponse{
+		AccessToken:  newAccessToken,
+		RefreshToken: newRefreshToken,
+		ExpiresIn:    int64(s.cfg.AccessTokenExpiry.Seconds()),
+	}, nil
+}
+
+func (s *service) Logout(ctx context.Context, req LogoutRequest) error {
+	_ = s.repo.RevokeRefreshToken(ctx, req.RefreshToken)
+	return nil
 }

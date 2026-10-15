@@ -154,6 +154,41 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 	})
 }
 
+// RefreshToken handles issuing new access and refresh tokens (POST /api/v1/auth/refresh).
+func (h *Handler) RefreshToken(c *gin.Context) {
+	var req RefreshTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.handleValidationError(c, err)
+		return
+	}
+
+	res, err := h.service.RefreshToken(c.Request.Context(), req)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrUnauthorized) {
+			response.Error(c, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid, expired, or revoked refresh token")
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to refresh token")
+		return
+	}
+
+	response.Success(c, http.StatusOK, res)
+}
+
+// Logout handles terminating a session by revoking the refresh token (POST /api/v1/auth/logout).
+func (h *Handler) Logout(c *gin.Context) {
+	var req LogoutRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.handleValidationError(c, err)
+		return
+	}
+
+	_ = h.service.Logout(c.Request.Context(), req)
+	response.Success(c, http.StatusOK, gin.H{
+		"message": "Logged out successfully",
+	})
+}
+
 // handleValidationError formats binding errors into clean API error responses.
 func (h *Handler) handleValidationError(c *gin.Context, err error) {
 	if valErrors, ok := errors.AsType[validator.ValidationErrors](err); ok {
