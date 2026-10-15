@@ -84,14 +84,9 @@ func main() {
 	slog.Info("server exited cleanly")
 }
 
-// registerRoutes sets up all API route groups.
-// As we add modules in later phases, each module will register its own
-// routes here via its RegisterRoutes function.
 func registerRoutes(router *gin.Engine, cfg *config.Config) {
-	// API v1 group — all endpoints live under /api/v1
 	v1 := router.Group("/api/v1")
 
-	// Health check — always available, no auth required.
 	v1.GET("/health", func(c *gin.Context) {
 		response.Success(c, http.StatusOK, gin.H{
 			"service":     "devflow",

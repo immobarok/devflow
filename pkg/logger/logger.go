@@ -26,11 +26,8 @@ func Setup(environment, logLevel string) {
 
 	var handler slog.Handler
 	if environment == "production" {
-		// JSON output for production — structured logs for tools like
-		// Datadog, CloudWatch, or ELK stack.
 		handler = slog.NewJSONHandler(os.Stdout, opts)
 	} else {
-		// Text output for development — easier to read in the terminal.
 		handler = slog.NewTextHandler(os.Stdout, opts)
 	}
 
