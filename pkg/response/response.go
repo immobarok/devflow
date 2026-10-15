@@ -23,13 +23,13 @@ type FieldError struct {
 // successResponse is the standard envelope for successful API responses.
 type successResponse struct {
 	Status string      `json:"status"`
-	Data   interface{} `json:"data"`
+	Data   any `json:"data"`
 }
 
 // paginatedResponse extends the success envelope with pagination metadata.
 type paginatedResponse struct {
 	Status string      `json:"status"`
-	Data   interface{} `json:"data"`
+	Data   any `json:"data"`
 	Meta   Meta        `json:"meta"`
 }
 

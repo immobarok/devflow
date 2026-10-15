@@ -13,6 +13,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/mobarok/devflow/internal/auth"
+	"github.com/mobarok/devflow/internal/middleware"
 	"github.com/mobarok/devflow/pkg/config"
 	"github.com/mobarok/devflow/pkg/database"
 	"github.com/mobarok/devflow/pkg/logger"
@@ -40,6 +42,11 @@ func main() {
 	}
 	defer db.Close()
 
+	// Initialize Auth module dependencies
+	authRepo := auth.NewRepository(db)
+	authService := auth.NewService(authRepo, cfg)
+	authHandler := auth.NewHandler(authService)
+
 	// Create Gin router
 	if cfg.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -48,7 +55,7 @@ func main() {
 	router := gin.New()
 	router.Use(gin.Recovery())
 
-	registerRoutes(router, cfg)
+	registerRoutes(router, cfg, authHandler)
 
 	// Start server with graceful shutdown
 	srv := &http.Server{
@@ -84,7 +91,7 @@ func main() {
 	slog.Info("server exited cleanly")
 }
 
-func registerRoutes(router *gin.Engine, cfg *config.Config) {
+func registerRoutes(router *gin.Engine, cfg *config.Config, authHandler *auth.Handler) {
 	v1 := router.Group("/api/v1")
 
 	v1.GET("/health", func(c *gin.Context) {
@@ -94,4 +101,7 @@ func registerRoutes(router *gin.Engine, cfg *config.Config) {
 			"environment": cfg.Environment,
 		})
 	})
+
+	authMiddleware := middleware.AuthRequired(cfg.JWTSecret)
+	auth.RegisterRoutes(v1, authHandler, authMiddleware)
 }
