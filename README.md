@@ -51,21 +51,32 @@ make run
 ### Verify
 
 ```bash
+# Health check
 curl http://localhost:8080/api/v1/health
+
+# Register a new user
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "alex@devflow.io", "password": "Password123!", "first_name": "Alex", "last_name": "Rivers"}'
+
+# Login
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "alex@devflow.io", "password": "Password123!"}'
+
+# Access protected profile
+curl http://localhost:8080/api/v1/auth/me \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
-Expected response:
+## API Endpoints
 
-```json
-{
-  "status": "success",
-  "data": {
-    "service": "devflow",
-    "version": "0.1.0",
-    "environment": "development"
-  }
-}
-```
+| Method | Endpoint | Description | Auth Required |
+|---|---|---|---|
+| `GET` | `/api/v1/health` | Service health status | No |
+| `POST` | `/api/v1/auth/register` | Register new user account | No |
+| `POST` | `/api/v1/auth/login` | Authenticate user & receive tokens | No |
+| `GET` | `/api/v1/auth/me` | Fetch authenticated user profile | Yes (Bearer JWT) |
 
 ## Available Commands
 
