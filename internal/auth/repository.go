@@ -10,18 +10,14 @@ import (
 	apperrors "github.com/mobarok/devflow/pkg/errors"
 )
 
-// Repository manages database operations for authentication and users.
 type Repository struct {
 	db *sqlx.DB
 }
 
-// NewRepository creates a new auth repository.
 func NewRepository(db *sqlx.DB) *Repository {
 	return &Repository{db: db}
 }
 
-// FindUserByEmail fetches a user record by email address.
-// Returns apperrors.ErrNotFound if the user does not exist.
 func (r *Repository) FindUserByEmail(ctx context.Context, email string) (*User, error) {
 	var user User
 	query := `
@@ -38,8 +34,6 @@ func (r *Repository) FindUserByEmail(ctx context.Context, email string) (*User, 
 	return &user, nil
 }
 
-// FindUserByID fetches a user record by their unique UUID.
-// Returns apperrors.ErrNotFound if the user does not exist.
 func (r *Repository) FindUserByID(ctx context.Context, id string) (*User, error) {
 	var user User
 	query := `
@@ -56,7 +50,6 @@ func (r *Repository) FindUserByID(ctx context.Context, id string) (*User, error)
 	return &user, nil
 }
 
-// CreateUser inserts a new user record into the database and scans generated fields back into the struct.
 func (r *Repository) CreateUser(ctx context.Context, user *User) error {
 	query := `
 		INSERT INTO users (email, password, first_name, last_name, avatar_url, is_active)
@@ -100,7 +93,6 @@ func (r *Repository) SaveRefreshToken(ctx context.Context, token *RefreshToken) 
 	return nil
 }
 
-// FindRefreshToken retrieves a refresh token record by token string.
 func (r *Repository) FindRefreshToken(ctx context.Context, tokenString string) (*RefreshToken, error) {
 	var token RefreshToken
 	query := `
@@ -117,7 +109,6 @@ func (r *Repository) FindRefreshToken(ctx context.Context, tokenString string) (
 	return &token, nil
 }
 
-// RevokeRefreshToken marks a refresh token as revoked.
 func (r *Repository) RevokeRefreshToken(ctx context.Context, tokenString string) error {
 	query := `
 		UPDATE refresh_tokens
