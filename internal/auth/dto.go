@@ -40,3 +40,22 @@ func ToUserResponse(u *User) *UserResponse {
 		CreatedAt: u.CreatedAt,
 	}
 }
+
+type ForgotPasswordRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+type VerifyOTPRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	OTP   string `json:"otp" binding:"required,len=6"`
+}
+
+type VerifyOTPResponse struct {
+	ResetToken string `json:"reset_token"`
+	Message    string `json:"message"`
+}
+
+type ResetPasswordRequest struct {
+	ResetToken  string `json:"reset_token" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=8"`
+}

@@ -22,3 +22,12 @@ type RefreshToken struct {
 	IsRevoked bool      `db:"is_revoked" json:"is_revoked"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
+
+type PasswordReset struct {
+	ID        string    `db:"id" json:"id"`
+	UserID    string    `db:"user_id" json:"user_id"`
+	OTPHash   string    `db:"otp_hash" json:"-"`
+	ExpiresAt time.Time `db:"expires_at" json:"expires_at"`
+	IsUsed    bool      `db:"is_used" json:"is_used"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+}

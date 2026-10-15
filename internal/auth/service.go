@@ -2,8 +2,10 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -17,6 +19,9 @@ type Service interface {
 	Register(ctx context.Context, req RegisterRequest) (*AuthResponse, error)
 	Login(ctx context.Context, req LoginRequest) (*AuthResponse, error)
 	GetMe(ctx context.Context, userID string) (*UserResponse, error)
+	ForgotPassword(ctx context.Context, req ForgotPasswordRequest) (string, error)
+	VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*VerifyOTPResponse, error)
+	ResetPassword(ctx context.Context, req ResetPasswordRequest) error
 }
 
 type service struct {
@@ -123,4 +128,118 @@ func (s *service) generateAuthResponse(ctx context.Context, user *User) (*AuthRe
 		RefreshToken: refreshToken,
 		ExpiresIn:    int64(s.cfg.AccessTokenExpiry.Seconds()),
 	}, nil
+}
+
+func (s *service) ForgotPassword(ctx context.Context, req ForgotPasswordRequest) (string, error) {
+	user, err := s.repo.FindUserByEmail(ctx, req.Email)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrNotFound) {
+			slog.Warn("forgot password requested for non-existing email", "email", req.Email)
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to check user: %w", err)
+	}
+
+	otp, err := generateSecureOTP(6)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate secure otp: %w", err)
+	}
+
+	if err := s.repo.InvalidateExistingPasswordResets(ctx, user.ID); err != nil {
+		return "", fmt.Errorf("failed to invalidate old otp records: %w", err)
+	}
+
+	otpHash, err := bcrypt.GenerateFromPassword([]byte(otp), bcrypt.DefaultCost)
+	if err != nil {
+		return "", fmt.Errorf("failed to hash otp: %w", err)
+	}
+
+	resetRecord := &PasswordReset{
+		UserID:    user.ID,
+		OTPHash:   string(otpHash),
+		ExpiresAt: time.Now().Add(10 * time.Minute),
+		IsUsed:    false,
+	}
+
+	if err := s.repo.CreatePasswordReset(ctx, resetRecord); err != nil {
+		return "", fmt.Errorf("failed to persist password reset: %w", err)
+	}
+
+	slog.Info("password reset OTP generated", "email", user.Email, "otp", otp)
+
+	return otp, nil
+}
+
+func (s *service) VerifyOTP(ctx context.Context, req VerifyOTPRequest) (*VerifyOTPResponse, error) {
+	user, err := s.repo.FindUserByEmail(ctx, req.Email)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrNotFound) {
+			return nil, apperrors.ErrUnauthorized
+		}
+		return nil, fmt.Errorf("failed to find user: %w", err)
+	}
+
+	reset, err := s.repo.GetLatestActivePasswordReset(ctx, user.ID)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrNotFound) {
+			return nil, apperrors.ErrUnauthorized
+		}
+		return nil, fmt.Errorf("failed to find active otp: %w", err)
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(reset.OTPHash), []byte(req.OTP)); err != nil {
+		return nil, apperrors.ErrUnauthorized
+	}
+
+	if err := s.repo.MarkPasswordResetAsUsed(ctx, reset.ID); err != nil {
+		return nil, fmt.Errorf("failed to mark otp as used: %w", err)
+	}
+
+	resetToken, err := jwtpkg.GenerateResetToken(user.ID, user.Email, s.cfg.JWTSecret, 15*time.Minute)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate reset token: %w", err)
+	}
+
+	return &VerifyOTPResponse{
+		ResetToken: resetToken,
+		Message:    "OTP verified successfully",
+	}, nil
+}
+
+func (s *service) ResetPassword(ctx context.Context, req ResetPasswordRequest) error {
+	claims, err := jwtpkg.ValidateToken(req.ResetToken, s.cfg.JWTSecret)
+	if err != nil {
+		return apperrors.ErrUnauthorized
+	}
+
+	if claims.TokenType != "reset" {
+		return apperrors.ErrUnauthorized
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash new password: %w", err)
+	}
+
+	if err := s.repo.UpdateUserPassword(ctx, claims.UserID, string(hashedPassword)); err != nil {
+		return fmt.Errorf("failed to update user password: %w", err)
+	}
+
+	if err := s.repo.RevokeAllUserRefreshTokens(ctx, claims.UserID); err != nil {
+		slog.Error("failed to revoke user refresh tokens after password reset", "error", err, "user_id", claims.UserID)
+	}
+
+	return nil
+}
+
+func generateSecureOTP(length int) (string, error) {
+	const digits = "0123456789"
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	for i := range b {
+		b[i] = digits[int(b[i])%len(digits)]
+	}
+	return string(b), nil
 }

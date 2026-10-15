@@ -76,6 +76,9 @@ curl http://localhost:8080/api/v1/auth/me \
 | `GET` | `/api/v1/health` | Service health status | No |
 | `POST` | `/api/v1/auth/register` | Register new user account | No |
 | `POST` | `/api/v1/auth/login` | Authenticate user & receive tokens | No |
+| `POST` | `/api/v1/auth/forgot-password` | Request 6-digit OTP for password reset | No |
+| `POST` | `/api/v1/auth/verify-otp` | Verify OTP and receive temporary reset token | No |
+| `POST` | `/api/v1/auth/reset-password` | Reset password using verified reset token | No |
 | `GET` | `/api/v1/auth/me` | Fetch authenticated user profile | Yes (Bearer JWT) |
 
 ## Available Commands

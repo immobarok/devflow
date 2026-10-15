@@ -15,16 +15,18 @@ var (
 )
 
 type Claims struct {
-	UserID string `json:"user_id"`
-	Email  string `json:"email,omitempty"`
+	UserID    string `json:"user_id"`
+	Email     string `json:"email,omitempty"`
+	TokenType string `json:"token_type,omitempty"`
 	jwt.RegisteredClaims
 }
 
 func GenerateAccessToken(userID, email, secret string, ttl time.Duration) (string, error) {
 	now := time.Now()
 	claims := Claims{
-		UserID: userID,
-		Email:  email,
+		UserID:    userID,
+		Email:     email,
+		TokenType: "access",
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -45,7 +47,8 @@ func GenerateAccessToken(userID, email, secret string, ttl time.Duration) (strin
 func GenerateRefreshToken(userID, secret string, ttl time.Duration) (string, error) {
 	now := time.Now()
 	claims := Claims{
-		UserID: userID,
+		UserID:    userID,
+		TokenType: "refresh",
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -58,6 +61,29 @@ func GenerateRefreshToken(userID, secret string, ttl time.Duration) (string, err
 	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
 		return "", fmt.Errorf("failed to sign refresh token: %w", err)
+	}
+
+	return tokenString, nil
+}
+
+func GenerateResetToken(userID, email, secret string, ttl time.Duration) (string, error) {
+	now := time.Now()
+	claims := Claims{
+		UserID:    userID,
+		Email:     email,
+		TokenType: "reset",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID,
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+			ID:        uuid.NewString(),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		return "", fmt.Errorf("failed to sign reset token: %w", err)
 	}
 
 	return tokenString, nil

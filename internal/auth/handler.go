@@ -84,6 +84,76 @@ func (h *Handler) Me(c *gin.Context) {
 	response.Success(c, http.StatusOK, gin.H{"user": user})
 }
 
+// ForgotPassword handles initiating a password reset (POST /api/v1/auth/forgot-password).
+func (h *Handler) ForgotPassword(c *gin.Context) {
+	var req ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.handleValidationError(c, err)
+		return
+	}
+
+	otp, err := h.service.ForgotPassword(c.Request.Context(), req)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to process request")
+		return
+	}
+
+	data := gin.H{
+		"message":    "If an account with that email exists, an OTP has been sent",
+		"expires_in": 600,
+	}
+	// In development, also return the OTP in response for easy testing
+	if otp != "" {
+		data["dev_otp"] = otp
+	}
+
+	response.Success(c, http.StatusOK, data)
+}
+
+// VerifyOTP handles verifying the 6-digit OTP and issuing a reset token (POST /api/v1/auth/verify-otp).
+func (h *Handler) VerifyOTP(c *gin.Context) {
+	var req VerifyOTPRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.handleValidationError(c, err)
+		return
+	}
+
+	res, err := h.service.VerifyOTP(c.Request.Context(), req)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrUnauthorized) {
+			response.Error(c, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid or expired OTP")
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to verify OTP")
+		return
+	}
+
+	response.Success(c, http.StatusOK, res)
+}
+
+// ResetPassword handles updating the password using a verified reset token (POST /api/v1/auth/reset-password).
+func (h *Handler) ResetPassword(c *gin.Context) {
+	var req ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.handleValidationError(c, err)
+		return
+	}
+
+	err := h.service.ResetPassword(c.Request.Context(), req)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrUnauthorized) {
+			response.Error(c, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid or expired reset token")
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to reset password")
+		return
+	}
+
+	response.Success(c, http.StatusOK, gin.H{
+		"message": "Password has been reset successfully. Please log in with your new password.",
+	})
+}
+
 // handleValidationError formats binding errors into clean API error responses.
 func (h *Handler) handleValidationError(c *gin.Context, err error) {
 	if valErrors, ok := errors.AsType[validator.ValidationErrors](err); ok {
@@ -107,6 +177,8 @@ func formatValidationTag(fe validator.FieldError) string {
 		return "this field is required"
 	case "email":
 		return "must be a valid email address"
+	case "len":
+		return "must be exactly " + fe.Param() + " characters"
 	case "min":
 		return "must be at least " + fe.Param() + " characters"
 	default:

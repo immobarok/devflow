@@ -128,3 +128,92 @@ func (r *Repository) RevokeRefreshToken(ctx context.Context, tokenString string)
 	}
 	return nil
 }
+
+func (r *Repository) CreatePasswordReset(ctx context.Context, reset *PasswordReset) error {
+	query := `
+		INSERT INTO password_resets (user_id, otp_hash, expires_at, is_used)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, created_at
+	`
+	err := r.db.QueryRowContext(
+		ctx,
+		query,
+		reset.UserID,
+		reset.OTPHash,
+		reset.ExpiresAt,
+		reset.IsUsed,
+	).Scan(&reset.ID, &reset.CreatedAt)
+	if err != nil {
+		return fmt.Errorf("failed to save password reset record: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) GetLatestActivePasswordReset(ctx context.Context, userID string) (*PasswordReset, error) {
+	var reset PasswordReset
+	query := `
+		SELECT id, user_id, otp_hash, expires_at, is_used, created_at
+		FROM password_resets
+		WHERE user_id = $1 AND is_used = false AND expires_at > NOW()
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+	if err := r.db.GetContext(ctx, &reset, query, userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to query active password reset: %w", err)
+	}
+	return &reset, nil
+}
+
+func (r *Repository) MarkPasswordResetAsUsed(ctx context.Context, id string) error {
+	query := `UPDATE password_resets SET is_used = true WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("failed to mark password reset as used: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) InvalidateExistingPasswordResets(ctx context.Context, userID string) error {
+	query := `UPDATE password_resets SET is_used = true WHERE user_id = $1 AND is_used = false`
+	_, err := r.db.ExecContext(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to invalidate prior password resets: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) UpdateUserPassword(ctx context.Context, userID string, hashedPassword string) error {
+	query := `
+		UPDATE users
+		SET password = $1, updated_at = NOW()
+		WHERE id = $2
+	`
+	res, err := r.db.ExecContext(ctx, query, hashedPassword, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update user password: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rows == 0 {
+		return apperrors.ErrNotFound
+	}
+	return nil
+}
+
+func (r *Repository) RevokeAllUserRefreshTokens(ctx context.Context, userID string) error {
+	query := `
+		UPDATE refresh_tokens
+		SET is_revoked = true
+		WHERE user_id = $1 AND is_revoked = false
+	`
+	_, err := r.db.ExecContext(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to revoke user refresh tokens: %w", err)
+	}
+	return nil
+}
