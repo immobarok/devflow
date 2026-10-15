@@ -3,18 +3,22 @@ package config
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
 
 // Config holds all application configuration.
 // Values are loaded from environment variables with sensible defaults.
-// Additional fields (Database, Redis, JWT) will be added in later phases.
 type Config struct {
-	ServerPort  string
-	Environment string
-	LogLevel    string
-	DatabaseURL string
+	ServerPort         string
+	Environment        string
+	LogLevel           string
+	DatabaseURL        string
+	JWTSecret          string
+	JWTRefreshSecret   string
+	AccessTokenExpiry  time.Duration
+	RefreshTokenExpiry time.Duration
 }
 
 func Load() *Config {
@@ -23,10 +27,14 @@ func Load() *Config {
 	}
 
 	return &Config{
-		ServerPort:  getEnv("SERVER_PORT", "8080"),
-		Environment: getEnv("ENVIRONMENT", "development"),
-		LogLevel:    getEnv("LOG_LEVEL", "debug"),
-		DatabaseURL: getEnv("DATABASE_URL", ""),
+		ServerPort:         getEnv("SERVER_PORT", "8080"),
+		Environment:        getEnv("ENVIRONMENT", "development"),
+		LogLevel:           getEnv("LOG_LEVEL", "debug"),
+		DatabaseURL:        getEnv("DATABASE_URL", ""),
+		JWTSecret:          getEnv("JWT_SECRET", "devflow-default-jwt-secret-key-min-32-bytes"),
+		JWTRefreshSecret:   getEnv("JWT_REFRESH_SECRET", "devflow-default-refresh-secret-key-min-32-bytes"),
+		AccessTokenExpiry:  15 * time.Minute,
+		RefreshTokenExpiry: 7 * 24 * time.Hour,
 	}
 }
 
