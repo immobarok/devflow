@@ -15,6 +15,7 @@ import (
 
 	"github.com/mobarok/devflow/internal/auth"
 	"github.com/mobarok/devflow/internal/middleware"
+	"github.com/mobarok/devflow/internal/organization"
 	"github.com/mobarok/devflow/pkg/config"
 	"github.com/mobarok/devflow/pkg/database"
 	"github.com/mobarok/devflow/pkg/logger"
@@ -47,6 +48,11 @@ func main() {
 	authService := auth.NewService(authRepo, cfg)
 	authHandler := auth.NewHandler(authService)
 
+	// Initialize Organization module dependencies
+	orgRepo := organization.NewRepository(db)
+	orgService := organization.NewService(orgRepo)
+	orgHandler := organization.NewHandler(orgService)
+
 	// Create Gin router
 	if cfg.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -55,7 +61,7 @@ func main() {
 	router := gin.New()
 	router.Use(gin.Recovery())
 
-	registerRoutes(router, cfg, authHandler)
+	registerRoutes(router, cfg, authHandler, orgHandler, orgService)
 
 	// Start server with graceful shutdown
 	srv := &http.Server{
@@ -91,7 +97,13 @@ func main() {
 	slog.Info("server exited cleanly")
 }
 
-func registerRoutes(router *gin.Engine, cfg *config.Config, authHandler *auth.Handler) {
+func registerRoutes(
+	router *gin.Engine,
+	cfg *config.Config,
+	authHandler *auth.Handler,
+	orgHandler *organization.Handler,
+	orgChecker middleware.MemberChecker,
+) {
 	v1 := router.Group("/api/v1")
 
 	v1.GET("/health", func(c *gin.Context) {
@@ -104,4 +116,5 @@ func registerRoutes(router *gin.Engine, cfg *config.Config, authHandler *auth.Ha
 
 	authMiddleware := middleware.AuthRequired(cfg.JWTSecret)
 	auth.RegisterRoutes(v1, authHandler, authMiddleware)
+	organization.RegisterRoutes(v1, orgHandler, authMiddleware, orgChecker)
 }

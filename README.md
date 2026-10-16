@@ -82,6 +82,17 @@ curl http://localhost:8080/api/v1/auth/me \
 | `POST` | `/api/v1/auth/verify-otp` | Verify OTP and receive temporary reset token | No |
 | `POST` | `/api/v1/auth/reset-password` | Reset password using verified reset token | No |
 | `GET` | `/api/v1/auth/me` | Fetch authenticated user profile | Yes (Bearer JWT) |
+| `POST` | `/api/v1/organizations` | Create workspace (creator becomes owner) | Yes (Bearer JWT) |
+| `GET` | `/api/v1/organizations` | List current user's workspaces | Yes (Bearer JWT) |
+| `GET` | `/api/v1/organizations/:id` | Get organization details | Yes (Viewer+) |
+| `GET` | `/api/v1/organizations/slug/:slug` | Get organization by slug | Yes (Bearer JWT) |
+| `PATCH` | `/api/v1/organizations/:id` | Update organization profile | Yes (Admin+) |
+| `DELETE` | `/api/v1/organizations/:id` | Delete organization | Yes (Owner) |
+| `GET` | `/api/v1/organizations/:id/members` | List members with roles | Yes (Viewer+) |
+| `POST` | `/api/v1/organizations/:id/invitations` | Invite teammate with role | Yes (Admin+) |
+| `PATCH` | `/api/v1/organizations/:id/members/:member_id` | Update member role | Yes (Admin+) |
+| `DELETE` | `/api/v1/organizations/:id/members/:member_id` | Remove member | Yes (Admin+) |
+| `POST` | `/api/v1/invitations/accept` | Accept workspace invitation | Yes (Bearer JWT) |
 
 ## Available Commands
 
