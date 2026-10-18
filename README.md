@@ -102,6 +102,11 @@ curl http://localhost:8080/api/v1/auth/me \
 | `POST` | `/api/v1/projects/:id/members` | Add user to project | Yes (Bearer JWT) |
 | `PATCH` | `/api/v1/projects/:id/members/:user_id` | Update member project role | Yes (Bearer JWT) |
 | `DELETE` | `/api/v1/projects/:id/members/:user_id` | Remove user from project | Yes (Bearer JWT) |
+| `POST` | `/api/v1/projects/:id/tasks` | Create task within a project (auto-numbered e.g. DEV-1) | Yes (Project Member) |
+| `GET` | `/api/v1/projects/:id/tasks` | List & filter project tasks (status, priority, search, pagination) | Yes (Bearer JWT) |
+| `GET` | `/api/v1/tasks/:id` | Get task details with assignee & reporter | Yes (Bearer JWT) |
+| `PATCH` | `/api/v1/tasks/:id` | Update task status, priority, type, assignee, etc. | Yes (Bearer JWT) |
+| `DELETE` | `/api/v1/tasks/:id` | Delete task | Yes (Bearer JWT) |
 
 ## Available Commands
 
