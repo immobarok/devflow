@@ -93,6 +93,15 @@ curl http://localhost:8080/api/v1/auth/me \
 | `PATCH` | `/api/v1/organizations/:id/members/:member_id` | Update member role | Yes (Admin+) |
 | `DELETE` | `/api/v1/organizations/:id/members/:member_id` | Remove member | Yes (Admin+) |
 | `POST` | `/api/v1/invitations/accept` | Accept workspace invitation | Yes (Bearer JWT) |
+| `POST` | `/api/v1/organizations/:id/projects` | Create project within workspace | Yes (Admin+) |
+| `GET` | `/api/v1/organizations/:id/projects` | List projects in workspace | Yes (Viewer+) |
+| `GET` | `/api/v1/projects/:id` | Get project details and user's role | Yes (Bearer JWT) |
+| `PATCH` | `/api/v1/projects/:id` | Update project name, status, description | Yes (Bearer JWT) |
+| `DELETE` | `/api/v1/projects/:id` | Delete project | Yes (Bearer JWT) |
+| `GET` | `/api/v1/projects/:id/members` | List members of a project | Yes (Bearer JWT) |
+| `POST` | `/api/v1/projects/:id/members` | Add user to project | Yes (Bearer JWT) |
+| `PATCH` | `/api/v1/projects/:id/members/:user_id` | Update member project role | Yes (Bearer JWT) |
+| `DELETE` | `/api/v1/projects/:id/members/:user_id` | Remove user from project | Yes (Bearer JWT) |
 
 ## Available Commands
 

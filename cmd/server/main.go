@@ -16,6 +16,7 @@ import (
 	"github.com/mobarok/devflow/internal/auth"
 	"github.com/mobarok/devflow/internal/middleware"
 	"github.com/mobarok/devflow/internal/organization"
+	"github.com/mobarok/devflow/internal/projects"
 	"github.com/mobarok/devflow/pkg/config"
 	"github.com/mobarok/devflow/pkg/database"
 	"github.com/mobarok/devflow/pkg/logger"
@@ -53,6 +54,11 @@ func main() {
 	orgService := organization.NewService(orgRepo)
 	orgHandler := organization.NewHandler(orgService)
 
+	// Initialize Projects module dependencies
+	projectRepo := projects.NewRepository(db)
+	projectService := projects.NewService(projectRepo)
+	projectHandler := projects.NewHandler(projectService)
+
 	// Create Gin router
 	if cfg.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -61,7 +67,7 @@ func main() {
 	router := gin.New()
 	router.Use(gin.Recovery())
 
-	registerRoutes(router, cfg, authHandler, orgHandler, orgService)
+	registerRoutes(router, cfg, authHandler, orgHandler, projectHandler, orgService)
 
 	// Start server with graceful shutdown
 	srv := &http.Server{
@@ -102,6 +108,7 @@ func registerRoutes(
 	cfg *config.Config,
 	authHandler *auth.Handler,
 	orgHandler *organization.Handler,
+	projectHandler *projects.Handler,
 	orgChecker middleware.MemberChecker,
 ) {
 	v1 := router.Group("/api/v1")
@@ -117,4 +124,5 @@ func registerRoutes(
 	authMiddleware := middleware.AuthRequired(cfg.JWTSecret)
 	auth.RegisterRoutes(v1, authHandler, authMiddleware)
 	organization.RegisterRoutes(v1, orgHandler, authMiddleware, orgChecker)
+	projects.RegisterRoutes(v1, projectHandler, authMiddleware, orgChecker)
 }
