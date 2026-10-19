@@ -20,10 +20,13 @@ import (
 	"github.com/mobarok/devflow/internal/organization"
 	"github.com/mobarok/devflow/internal/projects"
 	"github.com/mobarok/devflow/internal/tasks"
+	"github.com/mobarok/devflow/pkg/cache"
 	"github.com/mobarok/devflow/pkg/config"
 	"github.com/mobarok/devflow/pkg/database"
 	"github.com/mobarok/devflow/pkg/logger"
+	appRedis "github.com/mobarok/devflow/pkg/redis"
 	"github.com/mobarok/devflow/pkg/response"
+	goredis "github.com/redis/go-redis/v9"
 )
 
 const version = "0.1.0"
@@ -47,6 +50,24 @@ func main() {
 	}
 	defer db.Close()
 
+	// Initialize Redis client, Cache, and Token Blacklist
+	var redisClient *goredis.Client
+	var appCache cache.Cache
+	var tokenBlacklist auth.TokenBlacklist
+
+	if cfg.RedisURL != "" {
+		rc, err := appRedis.Connect(cfg.RedisURL)
+		if err != nil {
+			slog.Warn("failed to connect to Redis; proceeding without cache/rate-limiting", "error", err)
+		} else {
+			redisClient = rc
+			defer redisClient.Close()
+			appCache = cache.New(redisClient)
+			tokenBlacklist = auth.NewTokenBlacklist(redisClient)
+			slog.Info("Redis initialized: cache, rate limiting, and token blacklist active")
+		}
+	}
+
 	authRepo := auth.NewRepository(db)
 	authService := auth.NewService(authRepo, cfg)
 	authHandler := auth.NewHandler(authService)
@@ -56,7 +77,7 @@ func main() {
 	orgHandler := organization.NewHandler(orgService)
 
 	projectRepo := projects.NewRepository(db)
-	projectService := projects.NewService(projectRepo)
+	projectService := projects.NewService(projectRepo, appCache)
 	projectHandler := projects.NewHandler(projectService)
 
 	// Initialize Activity module dependencies
@@ -82,7 +103,12 @@ func main() {
 	router := gin.New()
 	router.Use(gin.Recovery())
 
-	registerRoutes(router, cfg, authHandler, orgHandler, projectHandler, taskHandler, commentHandler, activityHandler, orgService)
+	// Attach Redis-backed global rate limiter (100 req/min)
+	if redisClient != nil {
+		router.Use(middleware.RateLimiter(redisClient, 100, time.Minute))
+	}
+
+	registerRoutes(router, cfg, authHandler, orgHandler, projectHandler, taskHandler, commentHandler, activityHandler, tokenBlacklist, orgService)
 
 	// Start server with graceful shutdown
 	srv := &http.Server{
@@ -127,6 +153,7 @@ func registerRoutes(
 	taskHandler *tasks.Handler,
 	commentHandler *comments.Handler,
 	activityHandler *activity.Handler,
+	tokenBlacklist auth.TokenBlacklist,
 	orgChecker middleware.MemberChecker,
 ) {
 	v1 := router.Group("/api/v1")
@@ -139,7 +166,7 @@ func registerRoutes(
 		})
 	})
 
-	authMiddleware := middleware.AuthRequired(cfg.JWTSecret)
+	authMiddleware := middleware.AuthRequired(cfg.JWTSecret, tokenBlacklist)
 	auth.RegisterRoutes(v1, authHandler, authMiddleware)
 	organization.RegisterRoutes(v1, orgHandler, authMiddleware, orgChecker)
 	projects.RegisterRoutes(v1, projectHandler, authMiddleware, orgChecker)

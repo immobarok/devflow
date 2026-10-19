@@ -15,6 +15,7 @@ type Config struct {
 	Environment        string
 	LogLevel           string
 	DatabaseURL        string
+	RedisURL           string
 	JWTSecret          string
 	JWTRefreshSecret   string
 	AccessTokenExpiry  time.Duration
@@ -31,6 +32,7 @@ func Load() *Config {
 		Environment:        getEnv("ENVIRONMENT", "development"),
 		LogLevel:           getEnv("LOG_LEVEL", "debug"),
 		DatabaseURL:        getEnv("DATABASE_URL", ""),
+		RedisURL:           getEnv("REDIS_URL", ""),
 		JWTSecret:          getEnv("JWT_SECRET", "devflow-default-jwt-secret-key-min-32-bytes"),
 		JWTRefreshSecret:   getEnv("JWT_REFRESH_SECRET", "devflow-default-refresh-secret-key-min-32-bytes"),
 		AccessTokenExpiry:  15 * time.Minute,

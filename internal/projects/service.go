@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/mobarok/devflow/pkg/cache"
 	apperrors "github.com/mobarok/devflow/pkg/errors"
 )
 
@@ -24,11 +26,16 @@ type Service interface {
 }
 
 type service struct {
-	repo Repository
+	repo  Repository
+	cache cache.Cache
 }
 
-func NewService(repo Repository) Service {
-	return &service{repo: repo}
+func NewService(repo Repository, c ...cache.Cache) Service {
+	var ca cache.Cache
+	if len(c) > 0 {
+		ca = c[0]
+	}
+	return &service{repo: repo, cache: ca}
 }
 
 func (s *service) Create(ctx context.Context, orgID, userID string, req CreateProjectRequest) (*ProjectResponse, error) {
@@ -61,6 +68,14 @@ func (s *service) Create(ctx context.Context, orgID, userID string, req CreatePr
 }
 
 func (s *service) GetByID(ctx context.Context, projectID, userID string) (*ProjectResponse, error) {
+	cacheKey := fmt.Sprintf("project:%s", projectID)
+	if s.cache != nil {
+		var cached ProjectResponse
+		if err := s.cache.Get(ctx, cacheKey, &cached); err == nil {
+			return &cached, nil
+		}
+	}
+
 	project, err := s.repo.GetByID(ctx, projectID)
 	if err != nil {
 		return nil, err
@@ -72,7 +87,12 @@ func (s *service) GetByID(ctx context.Context, projectID, userID string) (*Proje
 		userRole = &member.Role
 	}
 
-	return ToProjectResponse(project, userRole), nil
+	resp := ToProjectResponse(project, userRole)
+	if s.cache != nil {
+		_ = s.cache.Set(ctx, cacheKey, resp, 5*time.Minute)
+	}
+
+	return resp, nil
 }
 
 func (s *service) GetByIDAndOrg(ctx context.Context, projectID, orgID, userID string) (*ProjectResponse, error) {
@@ -126,6 +146,10 @@ func (s *service) Update(ctx context.Context, projectID string, req UpdateProjec
 		return nil, fmt.Errorf("failed to update project: %w", err)
 	}
 
+	if s.cache != nil {
+		_ = s.cache.Delete(ctx, fmt.Sprintf("project:%s", projectID))
+	}
+
 	return ToProjectResponse(project, nil), nil
 }
 
@@ -133,7 +157,13 @@ func (s *service) Delete(ctx context.Context, projectID string) error {
 	if _, err := s.repo.GetByID(ctx, projectID); err != nil {
 		return err
 	}
-	return s.repo.Delete(ctx, projectID)
+	if err := s.repo.Delete(ctx, projectID); err != nil {
+		return err
+	}
+	if s.cache != nil {
+		_ = s.cache.Delete(ctx, fmt.Sprintf("project:%s", projectID))
+	}
+	return nil
 }
 
 func (s *service) AddMember(ctx context.Context, projectID string, req AssignMemberRequest) error {
