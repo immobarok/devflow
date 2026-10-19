@@ -26,8 +26,10 @@ import (
 	"github.com/mobarok/devflow/pkg/database"
 	"github.com/mobarok/devflow/pkg/email"
 	"github.com/mobarok/devflow/pkg/logger"
+	"github.com/mobarok/devflow/pkg/pubsub"
 	appRedis "github.com/mobarok/devflow/pkg/redis"
 	"github.com/mobarok/devflow/pkg/response"
+	appWS "github.com/mobarok/devflow/pkg/websocket"
 	"github.com/mobarok/devflow/pkg/worker"
 	goredis "github.com/redis/go-redis/v9"
 )
@@ -53,21 +55,23 @@ func main() {
 	}
 	defer db.Close()
 
-	// Initialize Redis client, Cache, and Token Blacklist
+	// Initialize Redis client, Cache, Token Blacklist, and Pub/Sub Bus
 	var redisClient *goredis.Client
 	var appCache cache.Cache
 	var tokenBlacklist auth.TokenBlacklist
+	var pubSubBus pubsub.Bus
 
 	if cfg.RedisURL != "" {
 		rc, err := appRedis.Connect(cfg.RedisURL)
 		if err != nil {
-			slog.Warn("failed to connect to Redis; proceeding without cache/rate-limiting", "error", err)
+			slog.Warn("failed to connect to Redis; proceeding without cache/rate-limiting/pubsub", "error", err)
 		} else {
 			redisClient = rc
 			defer redisClient.Close()
 			appCache = cache.New(redisClient)
 			tokenBlacklist = auth.NewTokenBlacklist(redisClient)
-			slog.Info("Redis initialized: cache, rate limiting, and token blacklist active")
+			pubSubBus = pubsub.NewBus(redisClient)
+			slog.Info("Redis initialized: cache, rate limiting, token blacklist, and Pub/Sub active")
 		}
 	}
 
@@ -107,9 +111,17 @@ func main() {
 	emailService := email.NewService(workerPool)
 	_ = emailService
 
-	// Initialize Notifications module dependencies
+	// Initialize WebSocket Hub and start event loop
+	wsHub := appWS.NewHub(pubSubBus)
+	hubCtx, hubCancel := context.WithCancel(context.Background())
+	defer hubCancel()
+	go wsHub.Run(hubCtx)
+
+	wsHandler := appWS.NewHandler(wsHub, cfg.JWTSecret)
+
+	// Initialize Notifications module dependencies (with pubSubBus for real-time delivery)
 	notifRepo := notifications.NewRepository(db)
-	notifService := notifications.NewService(notifRepo, workerPool)
+	notifService := notifications.NewService(notifRepo, workerPool, pubSubBus)
 	notifHandler := notifications.NewHandler(notifService)
 
 	// Create Gin router
@@ -125,7 +137,7 @@ func main() {
 		router.Use(middleware.RateLimiter(redisClient, 100, time.Minute))
 	}
 
-	registerRoutes(router, cfg, authHandler, orgHandler, projectHandler, taskHandler, commentHandler, activityHandler, notifHandler, tokenBlacklist, orgService)
+	registerRoutes(router, cfg, authHandler, orgHandler, projectHandler, taskHandler, commentHandler, activityHandler, notifHandler, wsHandler, tokenBlacklist, orgService)
 
 	// Start server with graceful shutdown
 	srv := &http.Server{
@@ -171,6 +183,7 @@ func registerRoutes(
 	commentHandler *comments.Handler,
 	activityHandler *activity.Handler,
 	notifHandler *notifications.Handler,
+	wsHandler *appWS.Handler,
 	tokenBlacklist auth.TokenBlacklist,
 	orgChecker middleware.MemberChecker,
 ) {
@@ -183,6 +196,9 @@ func registerRoutes(
 			"environment": cfg.Environment,
 		})
 	})
+
+	// WebSocket endpoint for real-time notifications and updates
+	v1.GET("/ws", wsHandler.HandleWebSocket)
 
 	authMiddleware := middleware.AuthRequired(cfg.JWTSecret, tokenBlacklist)
 	auth.RegisterRoutes(v1, authHandler, authMiddleware)

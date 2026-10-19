@@ -117,6 +117,7 @@ curl http://localhost:8080/api/v1/auth/me \
 | `GET` | `/api/v1/notifications/unread-count` | Get unread notifications count (partial index) | Yes (Bearer JWT) |
 | `PATCH` | `/api/v1/notifications/:id/read` | Mark a notification as read | Yes (Bearer JWT) |
 | `POST` | `/api/v1/notifications/read-all` | Mark all user notifications as read | Yes (Bearer JWT) |
+| `GET` | `/api/v1/ws` | Real-time WebSocket stream (Redis Pub/Sub) | Yes (JWT query `?token=...`) |
 
 ## Available Commands
 
