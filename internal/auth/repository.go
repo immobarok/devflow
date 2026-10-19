@@ -217,3 +217,85 @@ func (r *Repository) RevokeAllUserRefreshTokens(ctx context.Context, userID stri
 	}
 	return nil
 }
+
+// FindOAuthAccount queries an OAuth record by provider name and provider-assigned user ID.
+func (r *Repository) FindOAuthAccount(ctx context.Context, provider, providerID string) (*OAuthAccount, error) {
+	var account OAuthAccount
+	query := `
+		SELECT id, user_id, provider, provider_id, created_at
+		FROM oauth_accounts
+		WHERE provider = $1 AND provider_id = $2
+	`
+	if err := r.db.GetContext(ctx, &account, query, provider, providerID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to query oauth account: %w", err)
+	}
+	return &account, nil
+}
+
+// LinkOAuthAccount links an existing user account to an OAuth provider.
+func (r *Repository) LinkOAuthAccount(ctx context.Context, userID, provider, providerID string) error {
+	query := `
+		INSERT INTO oauth_accounts (user_id, provider, provider_id)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (provider, provider_id) DO NOTHING
+	`
+	if _, err := r.db.ExecContext(ctx, query, userID, provider, providerID); err != nil {
+		return fmt.Errorf("failed to link oauth account: %w", err)
+	}
+	return nil
+}
+
+// CreateOAuthUserTx creates a new user without password and links their OAuth account inside a single transaction.
+func (r *Repository) CreateOAuthUserTx(ctx context.Context, user *User, provider, providerID string) error {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	userQuery := `
+		INSERT INTO users (email, password, first_name, last_name, avatar_url, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, created_at, updated_at
+	`
+	err = tx.QueryRowContext(
+		ctx,
+		userQuery,
+		user.Email,
+		user.Password,
+		user.FirstName,
+		user.LastName,
+		user.AvatarURL,
+		user.IsActive,
+	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("failed to create oauth user: %w", err)
+	}
+
+	oauthQuery := `
+		INSERT INTO oauth_accounts (user_id, provider, provider_id)
+		VALUES ($1, $2, $3)
+	`
+	if _, err := tx.ExecContext(ctx, oauthQuery, user.ID, provider, providerID); err != nil {
+		return fmt.Errorf("failed to link oauth account in tx: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit oauth transaction: %w", err)
+	}
+	return nil
+}
+
+// UpdateUserAvatar updates the avatar URL of a user.
+func (r *Repository) UpdateUserAvatar(ctx context.Context, userID, avatarURL string) error {
+	query := `UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2`
+	_, err := r.db.ExecContext(ctx, query, avatarURL, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update user avatar: %w", err)
+	}
+	return nil
+}
+

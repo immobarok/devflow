@@ -13,6 +13,7 @@ import (
 	"github.com/mobarok/devflow/pkg/config"
 	apperrors "github.com/mobarok/devflow/pkg/errors"
 	jwtpkg "github.com/mobarok/devflow/pkg/jwt"
+	"github.com/mobarok/devflow/pkg/oauth"
 )
 
 type Service interface {
@@ -24,17 +25,21 @@ type Service interface {
 	ResetPassword(ctx context.Context, req ResetPasswordRequest) error
 	RefreshToken(ctx context.Context, req RefreshTokenRequest) (*RefreshTokenResponse, error)
 	Logout(ctx context.Context, req LogoutRequest) error
+	GetOAuthAuthURL(provider, state string) (string, error)
+	HandleOAuthCallback(ctx context.Context, provider, code string) (*AuthResponse, error)
 }
 
 type service struct {
-	repo *Repository
-	cfg  *config.Config
+	repo     *Repository
+	cfg      *config.Config
+	oauthMgr *oauth.Manager
 }
 
-func NewService(repo *Repository, cfg *config.Config) Service {
+func NewService(repo *Repository, cfg *config.Config, oauthMgr *oauth.Manager) Service {
 	return &service{
-		repo: repo,
-		cfg:  cfg,
+		repo:     repo,
+		cfg:      cfg,
+		oauthMgr: oauthMgr,
 	}
 }
 
@@ -51,9 +56,10 @@ func (s *service) Register(ctx context.Context, req RegisterRequest) (*AuthRespo
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
+	passStr := string(hashedPassword)
 	user := &User{
 		Email:     req.Email,
-		Password:  string(hashedPassword),
+		Password:  &passStr,
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 		IsActive:  true,
@@ -79,7 +85,11 @@ func (s *service) Login(ctx context.Context, req LoginRequest) (*AuthResponse, e
 		return nil, apperrors.ErrUnauthorized
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+	if user.Password == nil {
+		return nil, apperrors.ErrUnauthorized
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(*user.Password), []byte(req.Password)); err != nil {
 		return nil, apperrors.ErrUnauthorized
 	}
 
@@ -315,3 +325,89 @@ func (s *service) Logout(ctx context.Context, req LogoutRequest) error {
 	_ = s.repo.RevokeRefreshToken(ctx, req.RefreshToken)
 	return nil
 }
+
+// GetOAuthAuthURL generates the OAuth authorization URL for the specified provider.
+func (s *service) GetOAuthAuthURL(provider, state string) (string, error) {
+	if s.oauthMgr == nil {
+		return "", fmt.Errorf("oauth manager is not configured")
+	}
+
+	p, err := s.oauthMgr.GetProvider(provider)
+	if err != nil {
+		return "", err
+	}
+
+	return p.GetAuthURL(state), nil
+}
+
+// HandleOAuthCallback handles exchanging the auth code, fetching the user profile,
+// provisioning or linking the account, and issuing JWT access and refresh tokens.
+func (s *service) HandleOAuthCallback(ctx context.Context, provider, code string) (*AuthResponse, error) {
+	if s.oauthMgr == nil {
+		return nil, fmt.Errorf("oauth manager is not configured")
+	}
+
+	p, err := s.oauthMgr.GetProvider(provider)
+	if err != nil {
+		return nil, err
+	}
+
+	profile, err := p.ExchangeAndFetchProfile(ctx, code)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authenticate with %s: %w", provider, err)
+	}
+
+	// 1. Check if OAuth account link already exists
+	oauthAcc, err := s.repo.FindOAuthAccount(ctx, profile.Provider, profile.ProviderID)
+	if err == nil && oauthAcc != nil {
+		user, err := s.repo.FindUserByID(ctx, oauthAcc.UserID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve linked user: %w", err)
+		}
+		if !user.IsActive {
+			return nil, apperrors.ErrUnauthorized
+		}
+		return s.generateAuthResponse(ctx, user)
+	}
+
+	// 2. Check if a user with this email already exists
+	existingUser, err := s.repo.FindUserByEmail(ctx, profile.Email)
+	if err == nil && existingUser != nil {
+		if !existingUser.IsActive {
+			return nil, apperrors.ErrUnauthorized
+		}
+
+		if err := s.repo.LinkOAuthAccount(ctx, existingUser.ID, profile.Provider, profile.ProviderID); err != nil {
+			return nil, fmt.Errorf("failed to link %s account: %w", provider, err)
+		}
+
+		if existingUser.AvatarURL == nil && profile.AvatarURL != "" {
+			_ = s.repo.UpdateUserAvatar(ctx, existingUser.ID, profile.AvatarURL)
+			existingUser.AvatarURL = &profile.AvatarURL
+		}
+
+		return s.generateAuthResponse(ctx, existingUser)
+	}
+
+	// 3. New user: atomically create user and OAuth link
+	var avatarURL *string
+	if profile.AvatarURL != "" {
+		avatarURL = &profile.AvatarURL
+	}
+
+	newUser := &User{
+		Email:     profile.Email,
+		Password:  nil,
+		FirstName: profile.FirstName,
+		LastName:  profile.LastName,
+		AvatarURL: avatarURL,
+		IsActive:  true,
+	}
+
+	if err := s.repo.CreateOAuthUserTx(ctx, newUser, profile.Provider, profile.ProviderID); err != nil {
+		return nil, fmt.Errorf("failed to create oauth user: %w", err)
+	}
+
+	return s.generateAuthResponse(ctx, newUser)
+}
+

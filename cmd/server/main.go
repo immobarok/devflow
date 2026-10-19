@@ -26,6 +26,7 @@ import (
 	"github.com/mobarok/devflow/pkg/database"
 	"github.com/mobarok/devflow/pkg/email"
 	"github.com/mobarok/devflow/pkg/logger"
+	"github.com/mobarok/devflow/pkg/oauth"
 	"github.com/mobarok/devflow/pkg/pubsub"
 	appRedis "github.com/mobarok/devflow/pkg/redis"
 	"github.com/mobarok/devflow/pkg/response"
@@ -75,9 +76,10 @@ func main() {
 		}
 	}
 
+	oauthMgr := oauth.NewManager(cfg)
 	authRepo := auth.NewRepository(db)
-	authService := auth.NewService(authRepo, cfg)
-	authHandler := auth.NewHandler(authService)
+	authService := auth.NewService(authRepo, cfg, oauthMgr)
+	authHandler := auth.NewHandler(authService, cfg)
 
 	orgRepo := organization.NewRepository(db)
 	orgService := organization.NewService(orgRepo)

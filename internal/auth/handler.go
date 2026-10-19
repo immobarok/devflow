@@ -1,12 +1,17 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 
+	"github.com/mobarok/devflow/pkg/config"
 	apperrors "github.com/mobarok/devflow/pkg/errors"
 	"github.com/mobarok/devflow/pkg/response"
 )
@@ -14,11 +19,15 @@ import (
 // Handler handles HTTP requests for authentication.
 type Handler struct {
 	service Service
+	cfg     *config.Config
 }
 
 // NewHandler creates a new auth HTTP handler.
-func NewHandler(service Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service Service, cfg *config.Config) *Handler {
+	return &Handler{
+		service: service,
+		cfg:     cfg,
+	}
 }
 
 // Register handles user registration (POST /api/v1/auth/register).
@@ -219,4 +228,91 @@ func formatValidationTag(fe validator.FieldError) string {
 	default:
 		return "failed validation on tag: " + fe.Tag()
 	}
+}
+
+// OAuthLogin initiates the OAuth authorization flow for a specific provider.
+func (h *Handler) OAuthLogin(provider string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		state, err := generateRandomHex(16)
+		if err != nil {
+			response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to generate security state")
+			return
+		}
+
+		// Store state in an HTTP-only cookie for CSRF verification (5 minutes expiry)
+		c.SetCookie("oauth_state", state, 300, "/", "", false, true)
+
+		authURL, err := h.service.GetOAuthAuthURL(provider, state)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+			return
+		}
+
+		c.Redirect(http.StatusTemporaryRedirect, authURL)
+	}
+}
+
+// OAuthCallback processes the callback from an OAuth provider with the authorization code.
+func (h *Handler) OAuthCallback(provider string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if oauthErr := c.Query("error"); oauthErr != "" {
+			errDesc := c.DefaultQuery("error_description", oauthErr)
+			h.handleOAuthError(c, fmt.Sprintf("OAuth error: %s", errDesc))
+			return
+		}
+
+		cookieState, _ := c.Cookie("oauth_state")
+		queryState := c.Query("state")
+		c.SetCookie("oauth_state", "", -1, "/", "", false, true)
+
+		if cookieState != "" && queryState != cookieState {
+			h.handleOAuthError(c, "Invalid or expired OAuth state")
+			return
+		}
+
+		code := c.Query("code")
+		if code == "" {
+			h.handleOAuthError(c, "Missing authorization code")
+			return
+		}
+
+		authResp, err := h.service.HandleOAuthCallback(c.Request.Context(), provider, code)
+		if err != nil {
+			h.handleOAuthError(c, fmt.Sprintf("Authentication failed: %v", err))
+			return
+		}
+
+		if c.Query("format") == "json" || c.GetHeader("Accept") == "application/json" {
+			response.Success(c, http.StatusOK, authResp)
+			return
+		}
+
+		redirectURL := fmt.Sprintf("%s/auth/callback?access_token=%s&refresh_token=%s",
+			h.cfg.FrontendURL,
+			url.QueryEscape(authResp.AccessToken),
+			url.QueryEscape(authResp.RefreshToken),
+		)
+		c.Redirect(http.StatusTemporaryRedirect, redirectURL)
+	}
+}
+
+func (h *Handler) handleOAuthError(c *gin.Context, errMsg string) {
+	if c.Query("format") == "json" || c.GetHeader("Accept") == "application/json" {
+		response.Error(c, http.StatusUnauthorized, "OAUTH_FAILED", errMsg)
+		return
+	}
+
+	redirectURL := fmt.Sprintf("%s/auth/callback?error=%s",
+		h.cfg.FrontendURL,
+		url.QueryEscape(errMsg),
+	)
+	c.Redirect(http.StatusTemporaryRedirect, redirectURL)
+}
+
+func generateRandomHex(byteCount int) (string, error) {
+	b := make([]byte, byteCount)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }

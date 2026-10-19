@@ -13,5 +13,11 @@ func RegisterRoutes(rg *gin.RouterGroup, h *Handler, authMiddleware gin.HandlerF
 		authGroup.POST("/verify-otp", h.VerifyOTP)
 		authGroup.POST("/reset-password", h.ResetPassword)
 		authGroup.GET("/me", authMiddleware, h.Me)
+
+		// OAuth routes
+		authGroup.GET("/google", h.OAuthLogin("google"))
+		authGroup.GET("/google/callback", h.OAuthCallback("google"))
+		authGroup.GET("/github", h.OAuthLogin("github"))
+		authGroup.GET("/github/callback", h.OAuthCallback("github"))
 	}
 }
