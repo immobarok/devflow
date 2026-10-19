@@ -107,6 +107,12 @@ curl http://localhost:8080/api/v1/auth/me \
 | `GET` | `/api/v1/tasks/:id` | Get task details with assignee & reporter | Yes (Bearer JWT) |
 | `PATCH` | `/api/v1/tasks/:id` | Update task status, priority, type, assignee, etc. | Yes (Bearer JWT) |
 | `DELETE` | `/api/v1/tasks/:id` | Delete task | Yes (Bearer JWT) |
+| `POST` | `/api/v1/tasks/:id/comments` | Add comment to a task | Yes (Bearer JWT) |
+| `GET` | `/api/v1/tasks/:id/comments` | List all comments on a task with author profiles | Yes (Bearer JWT) |
+| `PATCH` | `/api/v1/comments/:id` | Update comment content (author only) | Yes (Bearer JWT) |
+| `DELETE` | `/api/v1/comments/:id` | Delete comment (author only) | Yes (Bearer JWT) |
+| `GET` | `/api/v1/projects/:id/activities` | List activity audit logs for a project | Yes (Bearer JWT) |
+| `GET` | `/api/v1/tasks/:id/activities` | List activity audit logs for a specific task | Yes (Bearer JWT) |
 
 ## Available Commands
 

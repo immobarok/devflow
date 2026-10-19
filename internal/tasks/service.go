@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mobarok/devflow/internal/activity"
 	apperrors "github.com/mobarok/devflow/pkg/errors"
 )
 
@@ -17,11 +18,15 @@ type Service interface {
 }
 
 type service struct {
-	repo Repository
+	repo            Repository
+	activityService activity.Service
 }
 
-func NewService(repo Repository) Service {
-	return &service{repo: repo}
+func NewService(repo Repository, activityService activity.Service) Service {
+	return &service{
+		repo:            repo,
+		activityService: activityService,
+	}
 }
 
 func (s *service) Create(ctx context.Context, projectID, userID string, req CreateTaskRequest) (*TaskResponse, error) {
@@ -83,6 +88,13 @@ func (s *service) Create(ctx context.Context, projectID, userID string, req Crea
 	details, err := s.repo.GetByID(ctx, task.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch created task: %w", err)
+	}
+
+	if s.activityService != nil {
+		_ = s.activityService.Log(ctx, orgID, projectID, &task.ID, userID, "task_created", map[string]any{
+			"task_key": fmt.Sprintf("%s-%d", details.ProjectKey, details.TaskNumber),
+			"title":    details.Title,
+		})
 	}
 
 	return ToTaskResponse(details), nil
@@ -175,6 +187,18 @@ func (s *service) Update(ctx context.Context, id string, req UpdateTaskRequest) 
 	updated, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch updated task: %w", err)
+	}
+
+	if s.activityService != nil {
+		actorID := ""
+		if existing.ReporterID != nil {
+			actorID = *existing.ReporterID
+		}
+		_ = s.activityService.Log(ctx, existing.OrganizationID, existing.ProjectID, &id, actorID, "task_updated", map[string]any{
+			"task_key":   fmt.Sprintf("%s-%d", existing.ProjectKey, existing.TaskNumber),
+			"old_status": existing.Status,
+			"new_status": updated.Status,
+		})
 	}
 
 	return ToTaskResponse(updated), nil

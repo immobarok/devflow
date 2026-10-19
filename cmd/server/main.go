@@ -13,7 +13,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/mobarok/devflow/internal/activity"
 	"github.com/mobarok/devflow/internal/auth"
+	"github.com/mobarok/devflow/internal/comments"
 	"github.com/mobarok/devflow/internal/middleware"
 	"github.com/mobarok/devflow/internal/organization"
 	"github.com/mobarok/devflow/internal/projects"
@@ -45,25 +47,32 @@ func main() {
 	}
 	defer db.Close()
 
-	// Initialize Auth module dependencies
 	authRepo := auth.NewRepository(db)
 	authService := auth.NewService(authRepo, cfg)
 	authHandler := auth.NewHandler(authService)
 
-	// Initialize Organization module dependencies
 	orgRepo := organization.NewRepository(db)
 	orgService := organization.NewService(orgRepo)
 	orgHandler := organization.NewHandler(orgService)
 
-	// Initialize Projects module dependencies
 	projectRepo := projects.NewRepository(db)
 	projectService := projects.NewService(projectRepo)
 	projectHandler := projects.NewHandler(projectService)
 
+	// Initialize Activity module dependencies
+	activityRepo := activity.NewRepository(db)
+	activityService := activity.NewService(activityRepo)
+	activityHandler := activity.NewHandler(activityService)
+
 	// Initialize Tasks module dependencies
 	taskRepo := tasks.NewRepository(db)
-	taskService := tasks.NewService(taskRepo)
+	taskService := tasks.NewService(taskRepo, activityService)
 	taskHandler := tasks.NewHandler(taskService)
+
+	// Initialize Comments module dependencies
+	commentRepo := comments.NewRepository(db)
+	commentService := comments.NewService(commentRepo, activityService)
+	commentHandler := comments.NewHandler(commentService)
 
 	// Create Gin router
 	if cfg.Environment == "production" {
@@ -73,7 +82,7 @@ func main() {
 	router := gin.New()
 	router.Use(gin.Recovery())
 
-	registerRoutes(router, cfg, authHandler, orgHandler, projectHandler, taskHandler, orgService)
+	registerRoutes(router, cfg, authHandler, orgHandler, projectHandler, taskHandler, commentHandler, activityHandler, orgService)
 
 	// Start server with graceful shutdown
 	srv := &http.Server{
@@ -116,6 +125,8 @@ func registerRoutes(
 	orgHandler *organization.Handler,
 	projectHandler *projects.Handler,
 	taskHandler *tasks.Handler,
+	commentHandler *comments.Handler,
+	activityHandler *activity.Handler,
 	orgChecker middleware.MemberChecker,
 ) {
 	v1 := router.Group("/api/v1")
@@ -133,4 +144,6 @@ func registerRoutes(
 	organization.RegisterRoutes(v1, orgHandler, authMiddleware, orgChecker)
 	projects.RegisterRoutes(v1, projectHandler, authMiddleware, orgChecker)
 	tasks.RegisterRoutes(v1, taskHandler, authMiddleware)
+	comments.RegisterRoutes(v1, commentHandler, authMiddleware)
+	activity.RegisterRoutes(v1, activityHandler, authMiddleware)
 }
