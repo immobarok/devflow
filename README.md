@@ -113,6 +113,10 @@ curl http://localhost:8080/api/v1/auth/me \
 | `DELETE` | `/api/v1/comments/:id` | Delete comment (author only) | Yes (Bearer JWT) |
 | `GET` | `/api/v1/projects/:id/activities` | List activity audit logs for a project | Yes (Bearer JWT) |
 | `GET` | `/api/v1/tasks/:id/activities` | List activity audit logs for a specific task | Yes (Bearer JWT) |
+| `GET` | `/api/v1/notifications` | List user notifications (paginated) | Yes (Bearer JWT) |
+| `GET` | `/api/v1/notifications/unread-count` | Get unread notifications count (partial index) | Yes (Bearer JWT) |
+| `PATCH` | `/api/v1/notifications/:id/read` | Mark a notification as read | Yes (Bearer JWT) |
+| `POST` | `/api/v1/notifications/read-all` | Mark all user notifications as read | Yes (Bearer JWT) |
 
 ## Available Commands
 

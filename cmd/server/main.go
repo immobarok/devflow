@@ -17,15 +17,18 @@ import (
 	"github.com/mobarok/devflow/internal/auth"
 	"github.com/mobarok/devflow/internal/comments"
 	"github.com/mobarok/devflow/internal/middleware"
+	"github.com/mobarok/devflow/internal/notifications"
 	"github.com/mobarok/devflow/internal/organization"
 	"github.com/mobarok/devflow/internal/projects"
 	"github.com/mobarok/devflow/internal/tasks"
 	"github.com/mobarok/devflow/pkg/cache"
 	"github.com/mobarok/devflow/pkg/config"
 	"github.com/mobarok/devflow/pkg/database"
+	"github.com/mobarok/devflow/pkg/email"
 	"github.com/mobarok/devflow/pkg/logger"
 	appRedis "github.com/mobarok/devflow/pkg/redis"
 	"github.com/mobarok/devflow/pkg/response"
+	"github.com/mobarok/devflow/pkg/worker"
 	goredis "github.com/redis/go-redis/v9"
 )
 
@@ -95,6 +98,20 @@ func main() {
 	commentService := comments.NewService(commentRepo, activityService)
 	commentHandler := comments.NewHandler(commentService)
 
+	// Initialize and start background worker pool
+	workerPool := worker.NewPool(5, 100)
+	workerPool.Start()
+	defer workerPool.Stop()
+
+	// Initialize Email service
+	emailService := email.NewService(workerPool)
+	_ = emailService
+
+	// Initialize Notifications module dependencies
+	notifRepo := notifications.NewRepository(db)
+	notifService := notifications.NewService(notifRepo, workerPool)
+	notifHandler := notifications.NewHandler(notifService)
+
 	// Create Gin router
 	if cfg.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -108,7 +125,7 @@ func main() {
 		router.Use(middleware.RateLimiter(redisClient, 100, time.Minute))
 	}
 
-	registerRoutes(router, cfg, authHandler, orgHandler, projectHandler, taskHandler, commentHandler, activityHandler, tokenBlacklist, orgService)
+	registerRoutes(router, cfg, authHandler, orgHandler, projectHandler, taskHandler, commentHandler, activityHandler, notifHandler, tokenBlacklist, orgService)
 
 	// Start server with graceful shutdown
 	srv := &http.Server{
@@ -153,6 +170,7 @@ func registerRoutes(
 	taskHandler *tasks.Handler,
 	commentHandler *comments.Handler,
 	activityHandler *activity.Handler,
+	notifHandler *notifications.Handler,
 	tokenBlacklist auth.TokenBlacklist,
 	orgChecker middleware.MemberChecker,
 ) {
@@ -173,4 +191,5 @@ func registerRoutes(
 	tasks.RegisterRoutes(v1, taskHandler, authMiddleware)
 	comments.RegisterRoutes(v1, commentHandler, authMiddleware)
 	activity.RegisterRoutes(v1, activityHandler, authMiddleware)
+	notifications.RegisterRoutes(v1, notifHandler, authMiddleware)
 }
