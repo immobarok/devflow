@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mobarok/devflow/pkg/pubsub"
 	"github.com/mobarok/devflow/pkg/worker"
 )
 
@@ -18,18 +19,31 @@ type Service interface {
 type service struct {
 	repo Repository
 	pool *worker.Pool
+	bus  pubsub.Bus
 }
 
-func NewService(repo Repository, pool *worker.Pool) Service {
+func NewService(repo Repository, pool *worker.Pool, bus ...pubsub.Bus) Service {
+	var b pubsub.Bus
+	if len(bus) > 0 {
+		b = bus[0]
+	}
 	return &service{
 		repo: repo,
 		pool: pool,
+		bus:  b,
 	}
 }
 
 func (s *service) Dispatch(n *Notification) {
 	job := func(ctx context.Context) error {
-		return s.repo.Create(ctx, n)
+		err := s.repo.Create(ctx, n)
+		if err == nil && s.bus != nil {
+			event, evErr := pubsub.NewEvent("notification", n, n.UserID)
+			if evErr == nil {
+				_ = s.bus.Publish(ctx, fmt.Sprintf("events:user:%s", n.UserID), event)
+			}
+		}
+		return err
 	}
 
 	if s.pool != nil {
