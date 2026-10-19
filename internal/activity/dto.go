@@ -19,7 +19,7 @@ type ActivityResponse struct {
 	ProjectID      string          `json:"project_id"`
 	TaskID         *string         `json:"task_id,omitempty"`
 	Action         string          `json:"action"`
-	Details        json.RawMessage `json:"details"`
+	Details        json.RawMessage `json:"details" swaggertype:"object"`
 	Actor          ActorSummary    `json:"actor"`
 	CreatedAt      time.Time       `json:"created_at"`
 }

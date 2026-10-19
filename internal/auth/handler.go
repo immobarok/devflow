@@ -31,6 +31,16 @@ func NewHandler(service Service, cfg *config.Config) *Handler {
 }
 
 // Register handles user registration (POST /api/v1/auth/register).
+// @Summary Register a new user
+// @Description Creates a new user account and returns JWT access and refresh tokens
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body RegisterRequest true "User registration details"
+// @Success 201 {object} response.SuccessResponse{data=AuthResponse}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /auth/register [post]
 func (h *Handler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -52,6 +62,16 @@ func (h *Handler) Register(c *gin.Context) {
 }
 
 // Login handles user login and token issuance (POST /api/v1/auth/login).
+// @Summary Login user
+// @Description Authenticates email and password credentials and returns JWT access and refresh tokens
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body LoginRequest true "Login credentials"
+// @Success 200 {object} response.SuccessResponse{data=AuthResponse}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Router /auth/login [post]
 func (h *Handler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -73,6 +93,14 @@ func (h *Handler) Login(c *gin.Context) {
 }
 
 // Me retrieves profile information for the authenticated user (GET /api/v1/auth/me).
+// @Summary Current user profile
+// @Description Fetches detailed profile of the currently authenticated user
+// @Tags Auth
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.SuccessResponse{data=UserResponse}
+// @Failure 401 {object} response.ErrorResponse
+// @Router /auth/me [get]
 func (h *Handler) Me(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -94,6 +122,15 @@ func (h *Handler) Me(c *gin.Context) {
 }
 
 // ForgotPassword handles initiating a password reset (POST /api/v1/auth/forgot-password).
+// @Summary Forgot password
+// @Description Initiates password reset by issuing a 6-digit OTP to the user's email
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body ForgotPasswordRequest true "Account email"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Router /auth/forgot-password [post]
 func (h *Handler) ForgotPassword(c *gin.Context) {
 	var req ForgotPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -120,6 +157,16 @@ func (h *Handler) ForgotPassword(c *gin.Context) {
 }
 
 // VerifyOTP handles verifying the 6-digit OTP and issuing a reset token (POST /api/v1/auth/verify-otp).
+// @Summary Verify OTP
+// @Description Verifies 6-digit OTP and issues a short-lived reset token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body VerifyOTPRequest true "Email and 6-digit OTP"
+// @Success 200 {object} response.SuccessResponse{data=VerifyOTPResponse}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Router /auth/verify-otp [post]
 func (h *Handler) VerifyOTP(c *gin.Context) {
 	var req VerifyOTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -141,6 +188,16 @@ func (h *Handler) VerifyOTP(c *gin.Context) {
 }
 
 // ResetPassword handles updating the password using a verified reset token (POST /api/v1/auth/reset-password).
+// @Summary Reset password
+// @Description Sets a new password using a verified reset token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body ResetPasswordRequest true "Verified reset token and new password"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Router /auth/reset-password [post]
 func (h *Handler) ResetPassword(c *gin.Context) {
 	var req ResetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -164,6 +221,16 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 }
 
 // RefreshToken handles issuing new access and refresh tokens (POST /api/v1/auth/refresh).
+// @Summary Refresh tokens
+// @Description Rotates and issues fresh access and refresh tokens
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body RefreshTokenRequest true "Valid refresh token"
+// @Success 200 {object} response.SuccessResponse{data=RefreshTokenResponse}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Router /auth/refresh [post]
 func (h *Handler) RefreshToken(c *gin.Context) {
 	var req RefreshTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -185,6 +252,15 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 }
 
 // Logout handles terminating a session by revoking the refresh token (POST /api/v1/auth/logout).
+// @Summary Logout
+// @Description Revokes refresh token to terminate session
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body LogoutRequest true "Refresh token to revoke"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Router /auth/logout [post]
 func (h *Handler) Logout(c *gin.Context) {
 	var req LogoutRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

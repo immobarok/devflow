@@ -15,7 +15,7 @@
 include .env
 export
 
-.PHONY: run build test lint tidy clean migrate-up migrate-down migrate-create help
+.PHONY: run build test lint tidy clean migrate-up migrate-down migrate-create swagger help
 
 .DEFAULT_GOAL := help
 
@@ -46,6 +46,11 @@ clean:
 	@echo "Cleaned build artifacts"
 
 MIGRATE_BIN := $(shell go env GOPATH)/bin/migrate
+SWAG_BIN := $(shell go env GOPATH)/bin/swag
+
+## swagger: Generate Swagger / OpenAPI documentation from doc comments
+swagger:
+	$(SWAG_BIN) init -g cmd/server/main.go -o docs
 
 ## migrate-up: Run all pending database migrations
 migrate-up:

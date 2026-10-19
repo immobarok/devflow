@@ -33,10 +33,27 @@ import (
 	appWS "github.com/mobarok/devflow/pkg/websocket"
 	"github.com/mobarok/devflow/pkg/worker"
 	goredis "github.com/redis/go-redis/v9"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+
+	_ "github.com/mobarok/devflow/docs"
 )
 
 const version = "0.1.0"
 
+// @title DevFlow API
+// @version 1.0
+// @description Production-grade project management SaaS REST API in Go with multi-tenancy, RBAC, background workers, and real-time WebSocket notifications.
+// @contact.name DevFlow Engineering
+// @contact.email support@devflow.io
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+// @host localhost:8080
+// @BasePath /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and your JWT token. Example: "Bearer eyJhbGciOi..."
 func main() {
 	cfg := config.Load()
 
@@ -189,6 +206,9 @@ func registerRoutes(
 	tokenBlacklist auth.TokenBlacklist,
 	orgChecker middleware.MemberChecker,
 ) {
+	// Swagger interactive documentation UI
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	v1 := router.Group("/api/v1")
 
 	v1.GET("/health", func(c *gin.Context) {

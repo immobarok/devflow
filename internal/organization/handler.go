@@ -18,6 +18,18 @@ func NewHandler(service Service) *Handler {
 	return &Handler{service: service}
 }
 
+// Create godoc
+// @Summary Create organization
+// @Description Creates a new organization workspace; the creator becomes the Owner
+// @Tags Organizations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body CreateOrganizationRequest true "Organization details"
+// @Success 201 {object} response.SuccessResponse{data=OrganizationResponse}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Router /organizations [post]
 func (h *Handler) Create(c *gin.Context) {
 	userID := c.GetString("user_id")
 	var req CreateOrganizationRequest
@@ -35,6 +47,15 @@ func (h *Handler) Create(c *gin.Context) {
 	response.Success(c, http.StatusCreated, org)
 }
 
+// List godoc
+// @Summary List user organizations
+// @Description Lists all organizations where the authenticated user is a member
+// @Tags Organizations
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.SuccessResponse{data=[]OrganizationResponse}
+// @Failure 401 {object} response.ErrorResponse
+// @Router /organizations [get]
 func (h *Handler) List(c *gin.Context) {
 	userID := c.GetString("user_id")
 	orgs, err := h.service.ListUserOrganizations(c.Request.Context(), userID)
@@ -46,6 +67,17 @@ func (h *Handler) List(c *gin.Context) {
 	response.Success(c, http.StatusOK, orgs)
 }
 
+// Get godoc
+// @Summary Get organization by ID
+// @Description Retrieves details of a specific organization by ID
+// @Tags Organizations
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Success 200 {object} response.SuccessResponse{data=OrganizationResponse}
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /organizations/{id} [get]
 func (h *Handler) Get(c *gin.Context) {
 	userID := c.GetString("user_id")
 	orgID := c.Param("id")
@@ -63,6 +95,17 @@ func (h *Handler) Get(c *gin.Context) {
 	response.Success(c, http.StatusOK, org)
 }
 
+// GetBySlug godoc
+// @Summary Get organization by slug
+// @Description Retrieves details of a specific organization by its URL slug
+// @Tags Organizations
+// @Produce json
+// @Security BearerAuth
+// @Param slug path string true "Organization slug"
+// @Success 200 {object} response.SuccessResponse{data=OrganizationResponse}
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /organizations/slug/{slug} [get]
 func (h *Handler) GetBySlug(c *gin.Context) {
 	userID := c.GetString("user_id")
 	slug := c.Param("slug")
@@ -80,6 +123,20 @@ func (h *Handler) GetBySlug(c *gin.Context) {
 	response.Success(c, http.StatusOK, org)
 }
 
+// Update godoc
+// @Summary Update organization
+// @Description Updates organization profile (name, logo, etc.)
+// @Tags Organizations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Param request body UpdateOrganizationRequest true "Updated details"
+// @Success 200 {object} response.SuccessResponse{data=OrganizationResponse}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Router /organizations/{id} [patch]
 func (h *Handler) Update(c *gin.Context) {
 	userID := c.GetString("user_id")
 	orgID := c.Param("id")
@@ -103,6 +160,17 @@ func (h *Handler) Update(c *gin.Context) {
 	response.Success(c, http.StatusOK, org)
 }
 
+// Delete godoc
+// @Summary Delete organization
+// @Description Permanently deletes an organization (owner only)
+// @Tags Organizations
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Router /organizations/{id} [delete]
 func (h *Handler) Delete(c *gin.Context) {
 	userID := c.GetString("user_id")
 	orgID := c.Param("id")
@@ -123,6 +191,16 @@ func (h *Handler) Delete(c *gin.Context) {
 	response.Success(c, http.StatusOK, gin.H{"message": "Organization deleted successfully"})
 }
 
+// GetMembers godoc
+// @Summary List organization members
+// @Description Retrieves the list of members and their roles in the organization
+// @Tags Organizations
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Success 200 {object} response.SuccessResponse{data=[]MemberResponse}
+// @Failure 401 {object} response.ErrorResponse
+// @Router /organizations/{id}/members [get]
 func (h *Handler) GetMembers(c *gin.Context) {
 	orgID := c.Param("id")
 	members, err := h.service.GetMembers(c.Request.Context(), orgID)
@@ -134,6 +212,19 @@ func (h *Handler) GetMembers(c *gin.Context) {
 	response.Success(c, http.StatusOK, members)
 }
 
+// InviteMember godoc
+// @Summary Invite member to organization
+// @Description Sends an invitation with a specified role to join the organization
+// @Tags Organizations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Param request body InviteMemberRequest true "Invitation details"
+// @Success 201 {object} response.SuccessResponse{data=InvitationResponse}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Router /organizations/{id}/invitations [post]
 func (h *Handler) InviteMember(c *gin.Context) {
 	userID := c.GetString("user_id")
 	orgID := c.Param("id")
@@ -153,6 +244,20 @@ func (h *Handler) InviteMember(c *gin.Context) {
 	response.Success(c, http.StatusCreated, invite)
 }
 
+// UpdateMemberRole godoc
+// @Summary Update member role in organization
+// @Description Updates the role of an existing member in the organization
+// @Tags Organizations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Param member_id path string true "Member User ID"
+// @Param request body UpdateMemberRoleRequest true "New role details"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Router /organizations/{id}/members/{member_id} [patch]
 func (h *Handler) UpdateMemberRole(c *gin.Context) {
 	operatorID := c.GetString("user_id")
 	orgID := c.Param("id")
@@ -180,6 +285,18 @@ func (h *Handler) UpdateMemberRole(c *gin.Context) {
 	response.Success(c, http.StatusOK, gin.H{"message": "Member role updated successfully"})
 }
 
+// RemoveMember godoc
+// @Summary Remove member from organization
+// @Description Removes a user from the organization
+// @Tags Organizations
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Param member_id path string true "Member User ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Router /organizations/{id}/members/{member_id} [delete]
 func (h *Handler) RemoveMember(c *gin.Context) {
 	operatorID := c.GetString("user_id")
 	orgID := c.Param("id")
@@ -201,6 +318,18 @@ func (h *Handler) RemoveMember(c *gin.Context) {
 	response.Success(c, http.StatusOK, gin.H{"message": "Member removed successfully"})
 }
 
+// AcceptInvitation godoc
+// @Summary Accept organization invitation
+// @Description Accepts an invitation token and adds the user to the organization
+// @Tags Organizations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body AcceptInvitationRequest true "Acceptance token"
+// @Success 200 {object} response.SuccessResponse{data=OrganizationResponse}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Router /invitations/accept [post]
 func (h *Handler) AcceptInvitation(c *gin.Context) {
 	userID := c.GetString("user_id")
 

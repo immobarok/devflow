@@ -20,29 +20,29 @@ type FieldError struct {
 	Message string `json:"message"`
 }
 
-// successResponse is the standard envelope for successful API responses.
-type successResponse struct {
-	Status string      `json:"status"`
-	Data   any `json:"data"`
+// SuccessResponse is the standard envelope for successful API responses.
+type SuccessResponse struct {
+	Status string `json:"status" example:"success"`
+	Data   any    `json:"data"`
 }
 
-// paginatedResponse extends the success envelope with pagination metadata.
-type paginatedResponse struct {
-	Status string      `json:"status"`
-	Data   any `json:"data"`
-	Meta   Meta        `json:"meta"`
+// PaginatedResponse extends the success envelope with pagination metadata.
+type PaginatedResponse struct {
+	Status string `json:"status" example:"success"`
+	Data   any    `json:"data"`
+	Meta   Meta   `json:"meta"`
 }
 
-// errorResponse is the standard envelope for error API responses.
-type errorResponse struct {
-	Status string      `json:"status"`
-	Error  errorDetail `json:"error"`
+// ErrorResponse is the standard envelope for error API responses.
+type ErrorResponse struct {
+	Status string      `json:"status" example:"error"`
+	Error  ErrorDetail `json:"error"`
 }
 
-// errorDetail holds the error code, message, and optional field-level details.
-type errorDetail struct {
-	Code    string       `json:"code"`
-	Message string       `json:"message"`
+// ErrorDetail holds the error code, message, and optional field-level details.
+type ErrorDetail struct {
+	Code    string       `json:"code" example:"BAD_REQUEST"`
+	Message string       `json:"message" example:"Invalid request body"`
 	Details []FieldError `json:"details,omitempty"`
 }
 
@@ -50,7 +50,7 @@ type errorDetail struct {
 //
 //	response.Success(c, http.StatusOK, gin.H{"user": user})
 func Success(c *gin.Context, statusCode int, data interface{}) {
-	c.JSON(statusCode, successResponse{
+	c.JSON(statusCode, SuccessResponse{
 		Status: "success",
 		Data:   data,
 	})
@@ -60,7 +60,7 @@ func Success(c *gin.Context, statusCode int, data interface{}) {
 //
 //	response.SuccessWithMeta(c, http.StatusOK, tasks, response.Meta{Page: 1, PerPage: 20, Total: 100, TotalPages: 5})
 func SuccessWithMeta(c *gin.Context, statusCode int, data interface{}, meta Meta) {
-	c.JSON(statusCode, paginatedResponse{
+	c.JSON(statusCode, PaginatedResponse{
 		Status: "success",
 		Data:   data,
 		Meta:   meta,
@@ -71,9 +71,9 @@ func SuccessWithMeta(c *gin.Context, statusCode int, data interface{}, meta Meta
 //
 //	response.Error(c, http.StatusNotFound, "NOT_FOUND", "Task not found")
 func Error(c *gin.Context, statusCode int, code string, message string) {
-	c.JSON(statusCode, errorResponse{
+	c.JSON(statusCode, ErrorResponse{
 		Status: "error",
-		Error: errorDetail{
+		Error: ErrorDetail{
 			Code:    code,
 			Message: message,
 		},
@@ -84,9 +84,9 @@ func Error(c *gin.Context, statusCode int, code string, message string) {
 //
 //	response.ValidationError(c, []response.FieldError{{Field: "title", Message: "must not be empty"}})
 func ValidationError(c *gin.Context, details []FieldError) {
-	c.JSON(http.StatusUnprocessableEntity, errorResponse{
+	c.JSON(http.StatusUnprocessableEntity, ErrorResponse{
 		Status: "error",
-		Error: errorDetail{
+		Error: ErrorDetail{
 			Code:    "VALIDATION_ERROR",
 			Message: "One or more fields failed validation",
 			Details: details,

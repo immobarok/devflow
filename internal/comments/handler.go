@@ -18,6 +18,20 @@ func NewHandler(service Service) *Handler {
 	return &Handler{service: service}
 }
 
+// Create godoc
+// @Summary Add comment to task
+// @Description Posts a new comment on a task and logs an activity audit record
+// @Tags Comments
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Task ID"
+// @Param request body CreateCommentRequest true "Comment body"
+// @Success 201 {object} response.SuccessResponse{data=CommentResponse}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /tasks/{id}/comments [post]
 func (h *Handler) Create(c *gin.Context) {
 	taskID := c.Param("id")
 	userID := c.GetString("user_id")
@@ -45,6 +59,17 @@ func (h *Handler) Create(c *gin.Context) {
 	response.Success(c, http.StatusCreated, comment)
 }
 
+// List godoc
+// @Summary List task comments
+// @Description Retrieves all comments on a specific task
+// @Tags Comments
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Task ID"
+// @Success 200 {object} response.SuccessResponse{data=[]CommentResponse}
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /tasks/{id}/comments [get]
 func (h *Handler) List(c *gin.Context) {
 	taskID := c.Param("id")
 
@@ -61,6 +86,21 @@ func (h *Handler) List(c *gin.Context) {
 	response.Success(c, http.StatusOK, comments)
 }
 
+// Update godoc
+// @Summary Update comment
+// @Description Updates comment content (author only)
+// @Tags Comments
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Comment ID"
+// @Param request body UpdateCommentRequest true "Updated comment"
+// @Success 200 {object} response.SuccessResponse{data=CommentResponse}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /comments/{id} [patch]
 func (h *Handler) Update(c *gin.Context) {
 	commentID := c.Param("id")
 	userID := c.GetString("user_id")
@@ -92,6 +132,18 @@ func (h *Handler) Update(c *gin.Context) {
 	response.Success(c, http.StatusOK, comment)
 }
 
+// Delete godoc
+// @Summary Delete comment
+// @Description Deletes a comment (author only)
+// @Tags Comments
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Comment ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /comments/{id} [delete]
 func (h *Handler) Delete(c *gin.Context) {
 	commentID := c.Param("id")
 	userID := c.GetString("user_id")

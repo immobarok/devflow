@@ -81,6 +81,10 @@ curl http://localhost:8080/api/v1/auth/me \
 | `POST` | `/api/v1/auth/forgot-password` | Request 6-digit OTP for password reset | No |
 | `POST` | `/api/v1/auth/verify-otp` | Verify OTP and receive temporary reset token | No |
 | `POST` | `/api/v1/auth/reset-password` | Reset password using verified reset token | No |
+| `GET` | `/api/v1/auth/google` | Initiate Google OAuth 2.0 login flow | No |
+| `GET` | `/api/v1/auth/google/callback` | Google OAuth callback (issues JWTs & redirects) | No |
+| `GET` | `/api/v1/auth/github` | Initiate GitHub OAuth 2.0 login flow | No |
+| `GET` | `/api/v1/auth/github/callback` | GitHub OAuth callback (issues JWTs & redirects) | No |
 | `GET` | `/api/v1/auth/me` | Fetch authenticated user profile | Yes (Bearer JWT) |
 | `POST` | `/api/v1/organizations` | Create workspace (creator becomes owner) | Yes (Bearer JWT) |
 | `GET` | `/api/v1/organizations` | List current user's workspaces | Yes (Bearer JWT) |
@@ -118,20 +122,38 @@ curl http://localhost:8080/api/v1/auth/me \
 | `PATCH` | `/api/v1/notifications/:id/read` | Mark a notification as read | Yes (Bearer JWT) |
 | `POST` | `/api/v1/notifications/read-all` | Mark all user notifications as read | Yes (Bearer JWT) |
 | `GET` | `/api/v1/ws` | Real-time WebSocket stream (Redis Pub/Sub) | Yes (JWT query `?token=...`) |
+| `GET` | `/swagger/*any` | Interactive Swagger / OpenAPI documentation UI | No |
+
+## API Documentation (Swagger)
+
+DevFlow includes interactive OpenAPI 2.0 / 3.0 documentation powered by `swaggo/swag` and `gin-swagger`:
+
+- **Swagger UI**: `http://localhost:8080/swagger/index.html`
+- **OpenAPI JSON Spec**: `http://localhost:8080/swagger/doc.json`
+
+Click **Authorize** in the Swagger UI and enter `Bearer <YOUR_ACCESS_TOKEN>` to test protected endpoints directly from your browser.
+
+To regenerate the documentation after updating route handlers:
+```bash
+make swagger
+```
 
 ## Available Commands
 
 ```bash
-make run       # Start the development server
-make build     # Build the binary
-make test      # Run all tests
-make lint      # Run linter
-make tidy      # Clean up dependencies
-make clean     # Remove build artifacts
-make help      # Show all commands
+make run          # Start the development server
+make build        # Build the binary
+make test         # Run all tests
+make lint         # Run linter
+make tidy         # Clean up dependencies
+make swagger      # Generate OpenAPI / Swagger documentation
+make migrate-up   # Run pending migrations
+make migrate-down # Roll back last migration
+make clean        # Remove build artifacts
+make help         # Show all commands
 ```
 
 ## License
 
 MIT
-# devflow
+

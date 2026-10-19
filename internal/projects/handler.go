@@ -18,6 +18,20 @@ func NewHandler(service Service) *Handler {
 	return &Handler{service: service}
 }
 
+// Create godoc
+// @Summary Create project
+// @Description Creates a new project in the specified organization
+// @Tags Projects
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Param request body CreateProjectRequest true "Project details"
+// @Success 201 {object} response.SuccessResponse{data=ProjectResponse}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /organizations/{id}/projects [post]
 func (h *Handler) Create(c *gin.Context) {
 	userID := c.GetString("user_id")
 	orgID := getOrgID(c)
@@ -49,6 +63,17 @@ func (h *Handler) Create(c *gin.Context) {
 	response.Success(c, http.StatusCreated, project)
 }
 
+// ListByOrg godoc
+// @Summary List projects in organization
+// @Description Retrieves all projects within an organization accessible to the user
+// @Tags Projects
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Organization ID"
+// @Success 200 {object} response.SuccessResponse{data=[]ProjectResponse}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Router /organizations/{id}/projects [get]
 func (h *Handler) ListByOrg(c *gin.Context) {
 	userID := c.GetString("user_id")
 	orgID := getOrgID(c)
@@ -66,6 +91,17 @@ func (h *Handler) ListByOrg(c *gin.Context) {
 	response.Success(c, http.StatusOK, projects)
 }
 
+// Get godoc
+// @Summary Get project by ID
+// @Description Retrieves details and user role for a project
+// @Tags Projects
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Project ID"
+// @Success 200 {object} response.SuccessResponse{data=ProjectResponse}
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /projects/{id} [get]
 func (h *Handler) Get(c *gin.Context) {
 	userID := c.GetString("user_id")
 	projectID := c.Param("id")
@@ -83,6 +119,20 @@ func (h *Handler) Get(c *gin.Context) {
 	response.Success(c, http.StatusOK, project)
 }
 
+// Update godoc
+// @Summary Update project
+// @Description Updates project details such as name, description, and status
+// @Tags Projects
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Project ID"
+// @Param request body UpdateProjectRequest true "Updated project details"
+// @Success 200 {object} response.SuccessResponse{data=ProjectResponse}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /projects/{id} [patch]
 func (h *Handler) Update(c *gin.Context) {
 	projectID := c.Param("id")
 
@@ -105,6 +155,17 @@ func (h *Handler) Update(c *gin.Context) {
 	response.Success(c, http.StatusOK, project)
 }
 
+// Delete godoc
+// @Summary Delete project
+// @Description Deletes a project and its associated tasks
+// @Tags Projects
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Project ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /projects/{id} [delete]
 func (h *Handler) Delete(c *gin.Context) {
 	projectID := c.Param("id")
 
@@ -120,6 +181,20 @@ func (h *Handler) Delete(c *gin.Context) {
 	response.Success(c, http.StatusOK, gin.H{"message": "Project deleted successfully"})
 }
 
+// AddMember godoc
+// @Summary Add member to project
+// @Description Assigns a user to a project with a specific project role
+// @Tags Projects
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Project ID"
+// @Param request body AssignMemberRequest true "Member assignment"
+// @Success 201 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /projects/{id}/members [post]
 func (h *Handler) AddMember(c *gin.Context) {
 	projectID := c.Param("id")
 
@@ -145,6 +220,17 @@ func (h *Handler) AddMember(c *gin.Context) {
 	response.Success(c, http.StatusCreated, gin.H{"message": "Member added successfully"})
 }
 
+// GetMembers godoc
+// @Summary List project members
+// @Description Retrieves all members assigned to a project
+// @Tags Projects
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Project ID"
+// @Success 200 {object} response.SuccessResponse{data=[]ProjectMemberResponse}
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /projects/{id}/members [get]
 func (h *Handler) GetMembers(c *gin.Context) {
 	projectID := c.Param("id")
 
@@ -161,6 +247,20 @@ func (h *Handler) GetMembers(c *gin.Context) {
 	response.Success(c, http.StatusOK, members)
 }
 
+// UpdateMemberRole godoc
+// @Summary Update project member role
+// @Description Updates the role of a user within a project
+// @Tags Projects
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Project ID"
+// @Param user_id path string true "User ID"
+// @Param request body UpdateMemberRoleRequest true "New project role"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Router /projects/{id}/members/{user_id} [patch]
 func (h *Handler) UpdateMemberRole(c *gin.Context) {
 	projectID := c.Param("id")
 	targetUserID := c.Param("user_id")
@@ -183,6 +283,18 @@ func (h *Handler) UpdateMemberRole(c *gin.Context) {
 	response.Success(c, http.StatusOK, gin.H{"message": "Member role updated successfully"})
 }
 
+// RemoveMember godoc
+// @Summary Remove project member
+// @Description Removes a user from a project
+// @Tags Projects
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Project ID"
+// @Param user_id path string true "User ID"
+// @Success 200 {object} response.SuccessResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /projects/{id}/members/{user_id} [delete]
 func (h *Handler) RemoveMember(c *gin.Context) {
 	projectID := c.Param("id")
 	targetUserID := c.Param("user_id")
